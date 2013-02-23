@@ -27,9 +27,8 @@ function Spaghetti:__init(conSrc, conDst, dimDst)
 end
 
 function Spaghetti:reset(stdv)
-   --from SpatialConvolutionMap
    if stdv then
-      stdv = stdv * math.sqrt(3)
+      stdv = stdv * math.sqrt(3)   --from SpatialConvolutionMap TODO: why??
       self.weight:apply(function() return torch.uniform(-stdv, stdv) end)
    else
       stdv = 1
@@ -54,13 +53,14 @@ function Spaghetti:updateGradInput(input, gradOutput)
 end
 
 function Spaghetti:accGradParameters(input, gradOutput, scale)
+   --TODO: unit test this function
    scale = scale or 1
    for i = 1,self.nCon do
-      self.gradWeights[i] = self.gradWeights[i] + scale*input[TH2table(self.conSrc[i])]*gradOutput[TH2table(self.conDst[i])]
+      self.gradWeight[i] = self.gradWeight[i] + scale*input[TH2table(self.conSrc[i])]*gradOutput[TH2table(self.conDst[i])]
    end
 end
 
 function Spaghetti:decayParameters(decay)
-   --from SpatialConvolutionMap
+   --from SpatialConvolutionMap, TODO: check what it is used for
    self.weight:add(-decay, self.weight)
 end
