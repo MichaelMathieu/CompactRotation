@@ -10,11 +10,11 @@ local targetMat = bf2mat(butterfly)
 local butterfly2 = torch.randn(n,N/2)
 local net = bf2nn(butterfly2)
 
-local nEpochs = 10
+local nEpochs = 100
 local nSamples = 100
 local criterion = nn.MSECriterion()
-local config = {learningRage = 1e-5, weightDecay = 0,
-		momentum = 0, learningRageDecay = 1e-7}
+local config = {learningRage = 1e-7, weightDecay = 0,
+		momentum = 0, learningRageDecay = 1e-9}
 local parameters, gradParameters = net:getParameters()
 local samples = torch.randn(nSamples, N)
 
@@ -36,6 +36,7 @@ for iEpoch = 1,nEpochs do
 		       return err, gradParameters
 		    end
       optim.sgd(feval, parameters, config)
+      bfNormalize(net)
    end
    meanErr = meanErr/nSamples
    print("meanErr=",meanErr)

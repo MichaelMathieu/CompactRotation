@@ -77,6 +77,21 @@ function bf2nn(butterfly)
    return out
 end
 
+function bfNormalize(net)
+   for iModule = 1,#net.modules do
+      local netElem = net.modules[iModule]
+      for i = 1,netElem.weight:size(1),4 do
+	 local c = 0.5 * (netElem.weight[i  ] + netElem.weight[i+3])
+	 local s = 0.5 * (netElem.weight[i+1] + netElem.weight[i+2])
+	 local normalizer = 1/math.sqrt(c*c+s*s)
+	 netElem.weight[i  ] =  c * normalizer
+	 netElem.weight[i+1] =  s * normalizer
+	 netElem.weight[i+2] = -s * normalizer
+	 netElem.weight[i+3] =  c * normalizer
+      end
+   end
+end
+
 function bf2matElem_testme()
    local butterflyElem = torch.randn(8)
    print(bf2matElem(butterflyElem, 1))
