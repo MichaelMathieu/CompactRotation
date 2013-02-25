@@ -13,8 +13,8 @@ local net = bf2nn(butterfly2)
 local nEpochs = 100
 local nSamples = 100
 local criterion = nn.MSECriterion()
-local config = {learningRate = 1, weightDecay = 0,
-		momentum = 0, learningRageDecay = 1e-5}
+local config = {learningRate = 5, weightDecay = 0,
+		momentum = 0, learningRageDecay = 1e-3}
 local parameters, gradParameters = net:getParameters()
 local samples = torch.randn(nSamples, N)
 
