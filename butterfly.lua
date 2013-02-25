@@ -82,7 +82,7 @@ function bfNormalize(net)
       local netElem = net.modules[iModule]
       for i = 1,netElem.weight:size(1),4 do
 	 local c = 0.5 * (netElem.weight[i  ] + netElem.weight[i+3])
-	 local s = 0.5 * (netElem.weight[i+1] + netElem.weight[i+2])
+	 local s = 0.5 * (netElem.weight[i+1] - netElem.weight[i+2])
 	 local normalizer = 1/math.sqrt(c*c+s*s)
 	 netElem.weight[i  ] =  c * normalizer
 	 netElem.weight[i+1] =  s * normalizer
