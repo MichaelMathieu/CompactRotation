@@ -18,8 +18,8 @@ end
 function Spaghetti:__init(conSrc, conDst, dimDst)
    parent.__init(self)
    self.nCon = conSrc:size(1)
-   self.conSrc = conSrc
-   self.conDst = conDst
+   self.conSrc = conSrc:long()
+   self.conDst = conDst:long()
    self.weight = torch.Tensor(self.nCon)
    self.gradWeight = torch.Tensor():resizeAs(self.weight)
    self.output = torch.Tensor(dimDst)

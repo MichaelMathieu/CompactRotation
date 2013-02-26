@@ -20,9 +20,10 @@ typedef double accreal;
 
 static int Spaghetti_updateOutput(lua_State* L) {
   const char* idreal = ID_TENSOR_STRING;
+  const char* idlong = "torch.LongTensor";
   Tensor* input   = (Tensor*)luaT_checkudata(L, 1, idreal);
-  Tensor* conSrc  = (Tensor*)luaT_checkudata(L, 2, idreal);
-  Tensor* conDst  = (Tensor*)luaT_checkudata(L, 3, idreal);
+  THLongTensor* conSrc  = (THLongTensor*)luaT_checkudata(L, 2, idlong);
+  THLongTensor* conDst  = (THLongTensor*)luaT_checkudata(L, 3, idlong);
   Tensor* weights = (Tensor*)luaT_checkudata(L, 4, idreal);
   Tensor* output  = (Tensor*)luaT_checkudata(L, 5, idreal);
 
@@ -34,15 +35,15 @@ static int Spaghetti_updateOutput(lua_State* L) {
   long* ws  = weights->stride;
   long* os  = output ->stride;
   Real* ip  = Tensor_(data)(input  );
-  Real* csp = Tensor_(data)(conSrc );
-  Real* cdp = Tensor_(data)(conDst );
+  long* csp = THLongTensor_data(conSrc );
+  long* cdp = THLongTensor_data(conDst );
   Real* wp  = Tensor_(data)(weights);
   Real* op  = Tensor_(data)(output );
 
   Tensor_(zero)(output);
 
   int i, j;
-  Real sidx, didx;
+  long sidx, didx;
 #pragma omp parallel for private(i, j, sidx, didx)
   for (i = 0; i < nCon; ++i) {
     sidx = didx = 0;
@@ -50,7 +51,7 @@ static int Spaghetti_updateOutput(lua_State* L) {
       sidx += is[j] * (csp[i*css[0] + j*css[1]] - 1);
       didx += os[j] * (cdp[i*cds[0] + j*cds[1]] - 1);
     }
-    *(op + (long)(didx+0.5)) += wp[ws[0]*i] * (*(ip + (long)(sidx+0.5)));
+    op[didx] += wp[ws[0]*i] * ip[sidx];
   }
   
   return 0;
@@ -58,9 +59,10 @@ static int Spaghetti_updateOutput(lua_State* L) {
 
 static int Spaghetti_updateGradInput(lua_State* L) {
   const char* idreal = ID_TENSOR_STRING;
+  const char* idlong = "torch.LongTensor";
   Tensor* input      = (Tensor*)luaT_checkudata(L, 1, idreal);
-  Tensor* conSrc     = (Tensor*)luaT_checkudata(L, 2, idreal);
-  Tensor* conDst     = (Tensor*)luaT_checkudata(L, 3, idreal);
+  THLongTensor* conSrc     = (THLongTensor*)luaT_checkudata(L, 2, idlong);
+  THLongTensor* conDst     = (THLongTensor*)luaT_checkudata(L, 3, idlong);
   Tensor* weights    = (Tensor*)luaT_checkudata(L, 4, idreal);
   Tensor* gradOutput = (Tensor*)luaT_checkudata(L, 5, idreal);
   Tensor* gradInput  = (Tensor*)luaT_checkudata(L, 6, idreal);
@@ -74,8 +76,8 @@ static int Spaghetti_updateGradInput(lua_State* L) {
   long* gos = gradOutput->stride;
   long* gis = gradInput ->stride;
   Real* ip  = Tensor_(data)(input     );
-  Real* csp = Tensor_(data)(conSrc    );
-  Real* cdp = Tensor_(data)(conDst    );
+  long* csp = THLongTensor_data(conSrc    );
+  long* cdp = THLongTensor_data(conDst    );
   Real* wp  = Tensor_(data)(weights   );
   Real* gop = Tensor_(data)(gradOutput);
   Real* gip = Tensor_(data)(gradInput );
@@ -83,14 +85,14 @@ static int Spaghetti_updateGradInput(lua_State* L) {
   Tensor_(zero)(gradInput);
 
   int i, j;
-  Real sidx, didx;
+  long sidx, didx;
   for (i = 0; i < nCon; ++i) {
     sidx = didx = 0;
     for (j = 0; j < nDims; ++j) {
       sidx += gis[j] * (csp[i*css[0] + j*css[1]] - 1);
       didx += gos[j] * (cdp[i*cds[0] + j*cds[1]] - 1);
     }
-    *(gip + (long)(sidx+0.5)) += wp[ws[0]*i] * (*(gop + (long)(didx+0.5)));
+    gip[sidx] += wp[ws[0]*i] * gop[didx];
   }
   
   return 0;
@@ -98,9 +100,10 @@ static int Spaghetti_updateGradInput(lua_State* L) {
 
 static int Spaghetti_accGradParameters(lua_State* L) {
   const char* idreal = ID_TENSOR_STRING;
+  const char* idlong = "torch.LongTensor";
   Tensor* input      = (Tensor*)luaT_checkudata(L, 1, idreal);
-  Tensor* conSrc     = (Tensor*)luaT_checkudata(L, 2, idreal);
-  Tensor* conDst     = (Tensor*)luaT_checkudata(L, 3, idreal);
+  THLongTensor* conSrc     = (THLongTensor*)luaT_checkudata(L, 2, idlong);
+  THLongTensor* conDst     = (THLongTensor*)luaT_checkudata(L, 3, idlong);
   Tensor* weights    = (Tensor*)luaT_checkudata(L, 4, idreal);
   Tensor* gradOutput = (Tensor*)luaT_checkudata(L, 5, idreal);
   Real    scale      =          lua_tonumber   (L, 6);
@@ -115,14 +118,14 @@ static int Spaghetti_accGradParameters(lua_State* L) {
   long* gos = gradOutput->stride;
   long* gws = gradWeight->stride;
   Real* ip  = Tensor_(data)(input     );
-  Real* csp = Tensor_(data)(conSrc    );
-  Real* cdp = Tensor_(data)(conDst    );
+  long* csp = THLongTensor_data(conSrc    );
+  long* cdp = THLongTensor_data(conDst    );
   Real* wp  = Tensor_(data)(weights   );
   Real* gop = Tensor_(data)(gradOutput);
   Real* gwp = Tensor_(data)(gradWeight);
 
   int i, j;
-  Real sidx, didx;
+  long sidx, didx;
 #pragma omp parallel for private(i, sidx, didx)
   for (i = 0; i < nCon; ++i) {
     sidx = didx = 0;
@@ -130,7 +133,7 @@ static int Spaghetti_accGradParameters(lua_State* L) {
       didx += gos[j] * (cdp[i*cds[0] + j*cds[1]] - 1);
       sidx += is [j] * (csp[i*css[0] + j*css[1]] - 1);
     }
-    gwp[i*gws[0]] += scale * (*(ip + (long)(sidx + 0.5))) * (*(gop + (long)(didx + 0.5)));
+    gwp[i*gws[0]] += scale * ip[sidx] * gop[didx];
   }
   
   return 0;

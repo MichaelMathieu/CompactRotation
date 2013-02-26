@@ -35,8 +35,8 @@ end
 
 function bf2nnElem(butterflyElem, stride)
    local N = butterflyElem:size(1)*2
-   local conSrc = torch.Tensor(N*2,1)
-   local conDst = torch.Tensor(N*2,1)
+   local conSrc = torch.LongTensor(N*2,1)
+   local conDst = torch.LongTensor(N*2,1)
    local weights = torch.Tensor(N*2)
    local k = 1
    for i = 1,(N-stride),(2*stride) do
