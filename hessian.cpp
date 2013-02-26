@@ -11,11 +11,129 @@ template<typename T> inline T min(T a, T b) {
   return (a < b) ? a : b;
 }
 
-typedef THFloatTensor Tensor;
-#define ID_TENSOR_STRING "torch.FloatTensor"
-#define Tensor_(a) THFloatTensor_##a
-typedef float Real;
+typedef THDoubleTensor Tensor;
+#define ID_TENSOR_STRING "torch.DoubleTensor"
+#define Tensor_(a) THDoubleTensor_##a
+typedef double Real;
 typedef double accreal;
+
+static int Spaghetti_updateOutput(lua_State* L) {
+  const char* idreal = ID_TENSOR_STRING;
+  Tensor* input   = (Tensor*)luaT_checkudata(L, 1, idreal);
+  Tensor* conSrc  = (Tensor*)luaT_checkudata(L, 2, idreal);
+  Tensor* conDst  = (Tensor*)luaT_checkudata(L, 3, idreal);
+  Tensor* weights = (Tensor*)luaT_checkudata(L, 4, idreal);
+  Tensor* output  = (Tensor*)luaT_checkudata(L, 5, idreal);
+
+  long nCon  = conSrc->size[0];
+  long nDims = conSrc->size[1];
+  long* is  = input  ->stride;
+  long* css = conSrc ->stride;
+  long* cds = conDst ->stride;
+  long* ws  = weights->stride;
+  long* os  = output ->stride;
+  Real* ip  = Tensor_(data)(input  );
+  Real* csp = Tensor_(data)(conSrc );
+  Real* cdp = Tensor_(data)(conDst );
+  Real* wp  = Tensor_(data)(weights);
+  Real* op  = Tensor_(data)(output );
+
+  Tensor_(zero)(output);
+
+  int i, j;
+  Real sidx, didx;
+#pragma omp parallel for private(i, j, sidx, didx)
+  for (i = 0; i < nCon; ++i) {
+    sidx = didx = 0;
+    for (j = 0; j < nDims; ++j) {
+      sidx += is[j] * (csp[i*css[0] + j*css[1]] - 1);
+      didx += os[j] * (cdp[i*cds[0] + j*cds[1]] - 1);
+    }
+    *(op + (long)(didx+0.5)) += wp[ws[0]*i] * (*(ip + (long)(sidx+0.5)));
+  }
+  
+  return 0;
+}
+
+static int Spaghetti_updateGradInput(lua_State* L) {
+  const char* idreal = ID_TENSOR_STRING;
+  Tensor* input      = (Tensor*)luaT_checkudata(L, 1, idreal);
+  Tensor* conSrc     = (Tensor*)luaT_checkudata(L, 2, idreal);
+  Tensor* conDst     = (Tensor*)luaT_checkudata(L, 3, idreal);
+  Tensor* weights    = (Tensor*)luaT_checkudata(L, 4, idreal);
+  Tensor* gradOutput = (Tensor*)luaT_checkudata(L, 5, idreal);
+  Tensor* gradInput  = (Tensor*)luaT_checkudata(L, 6, idreal);
+
+  long nCon  = conSrc->size[0];
+  long nDims = conSrc->size[1];
+  long* is  = input     ->stride;
+  long* css = conSrc    ->stride;
+  long* cds = conDst    ->stride;
+  long* ws  = weights   ->stride;
+  long* gos = gradOutput->stride;
+  long* gis = gradInput ->stride;
+  Real* ip  = Tensor_(data)(input     );
+  Real* csp = Tensor_(data)(conSrc    );
+  Real* cdp = Tensor_(data)(conDst    );
+  Real* wp  = Tensor_(data)(weights   );
+  Real* gop = Tensor_(data)(gradOutput);
+  Real* gip = Tensor_(data)(gradInput );
+
+  Tensor_(zero)(gradInput);
+
+  int i, j;
+  Real sidx, didx;
+  for (i = 0; i < nCon; ++i) {
+    sidx = didx = 0;
+    for (j = 0; j < nDims; ++j) {
+      sidx += gis[j] * (csp[i*css[0] + j*css[1]] - 1);
+      didx += gos[j] * (cdp[i*cds[0] + j*cds[1]] - 1);
+    }
+    *(gip + (long)(sidx+0.5)) += wp[ws[0]*i] * (*(gop + (long)(didx+0.5)));
+  }
+  
+  return 0;
+}
+
+static int Spaghetti_accGradParameters(lua_State* L) {
+  const char* idreal = ID_TENSOR_STRING;
+  Tensor* input      = (Tensor*)luaT_checkudata(L, 1, idreal);
+  Tensor* conSrc     = (Tensor*)luaT_checkudata(L, 2, idreal);
+  Tensor* conDst     = (Tensor*)luaT_checkudata(L, 3, idreal);
+  Tensor* weights    = (Tensor*)luaT_checkudata(L, 4, idreal);
+  Tensor* gradOutput = (Tensor*)luaT_checkudata(L, 5, idreal);
+  Real    scale      =          lua_tonumber   (L, 6);
+  Tensor* gradWeight = (Tensor*)luaT_checkudata(L, 7, idreal);
+
+  long nCon  = conSrc->size[0];
+  long nDims = conSrc->size[1];
+  long* is  = input     ->stride;
+  long* css = conSrc    ->stride;
+  long* cds = conDst    ->stride;
+  long* ws  = weights   ->stride;
+  long* gos = gradOutput->stride;
+  long* gws = gradWeight->stride;
+  Real* ip  = Tensor_(data)(input     );
+  Real* csp = Tensor_(data)(conSrc    );
+  Real* cdp = Tensor_(data)(conDst    );
+  Real* wp  = Tensor_(data)(weights   );
+  Real* gop = Tensor_(data)(gradOutput);
+  Real* gwp = Tensor_(data)(gradWeight);
+
+  int i, j;
+  Real sidx, didx;
+#pragma omp parallel for private(i, sidx, didx)
+  for (i = 0; i < nCon; ++i) {
+    sidx = didx = 0;
+    for (j = 0; j < nDims; ++j) {
+      didx += gos[j] * (cdp[i*cds[0] + j*cds[1]] - 1);
+      sidx += is [j] * (csp[i*css[0] + j*css[1]] - 1);
+    }
+    gwp[i*gws[0]] += scale * (*(ip + (long)(sidx + 0.5))) * (*(gop + (long)(didx + 0.5)));
+  }
+  
+  return 0;
+}
 
 static int QR(lua_State *L) {
   const char* iddouble = "torch.DoubleTensor";
@@ -73,6 +191,9 @@ static int QR(lua_State *L) {
 
 static const struct luaL_reg libhessian[] = {
   {"QR", QR},
+  {"spaghetti_updateOutput", Spaghetti_updateOutput},
+  {"spaghetti_updateGradInput", Spaghetti_updateGradInput},
+  {"spaghetti_accGradParameters", Spaghetti_accGradParameters},
   {NULL, NULL}
 };
 

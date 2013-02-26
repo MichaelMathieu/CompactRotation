@@ -1,20 +1,22 @@
 require 'butterfly'
 require 'nn'
 require 'optim'
+require 'randomRotation'
 
 local n = 6
 local N = 2^n
-local butterfly = torch.randn(n,N/2)
-local targetMat = bf2mat(butterfly)
+--local butterfly = torch.randn(n,N/2)
+--local targetMat = bf2mat(butterfly)
+local targetMat = randomRotation(N)
 
 local butterfly2 = torch.randn(n,N/2)
 local net = bf2nn(butterfly2)
 
-local nEpochs = 100
+local nEpochs = 10000
 local nSamples = 100
 local criterion = nn.MSECriterion()
-local config = {learningRate = 5, weightDecay = 0,
-		momentum = 0, learningRageDecay = 1e-3}
+local config = {learningRate = 1, weightDecay = 0,
+		momentum = 0, learningRageDecay = 1e-4}
 local parameters, gradParameters = net:getParameters()
 local samples = torch.randn(nSamples, N)
 
@@ -39,5 +41,5 @@ for iEpoch = 1,nEpochs do
       bfNormalize(net)
    end
    meanErr = meanErr/nSamples
-   print("meanErr=",meanErr)
+   print("meanErr="..meanErr.." (epoch "..iEpoch..")")
 end

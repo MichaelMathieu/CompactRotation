@@ -1,5 +1,6 @@
 require 'nn'
 require 'math'
+require 'libhessian'
 
 --TODO: this module is *NOT* optimized
 
@@ -37,27 +38,42 @@ function Spaghetti:reset(stdv)
 end
 
 function Spaghetti:updateOutput(input)
+   libhessian.spaghetti_updateOutput(input, self.conSrc, self.conDst,
+				     self.weight, self.output);
+   return self.output
+   --[[
    self.output:zero()
    for i = 1,self.nCon do
       self.output[TH2table(self.conDst[i])] = self.output[TH2table(self.conDst[i])] + self.weight[i] * input[TH2table(self.conSrc[i])]
    end
    return self.output
+   --]]
 end
 
 function Spaghetti:updateGradInput(input, gradOutput)
+   self.gradInput:resizeAs(input)
+   libhessian.spaghetti_updateGradInput(input, self.conSrc, self.conDst,
+					self.weight, gradOutput, self.gradInput)
+   return self.gradInput
+   --[[
    self.gradInput:resizeAs(input):zero()
    for i = 1,self.nCon do
       self.gradInput[TH2table(self.conSrc[i])] = self.gradInput[TH2table(self.conSrc[i])] + self.weight[i] * gradOutput[TH2table(self.conDst[i])]
    end
    return self.gradInput
+   --]]
 end
 
 function Spaghetti:accGradParameters(input, gradOutput, scale)
    --TODO: unit test this function
    scale = scale or 1
+   libhessian.spaghetti_accGradParameters(input, self.conSrc, self.conDst, self.weight,
+					  gradOutput, scale, self.gradWeight)
+   --[[
    for i = 1,self.nCon do
       self.gradWeight[i] = self.gradWeight[i] + scale*input[TH2table(self.conSrc[i])]*gradOutput[TH2table(self.conDst[i])]
    end
+   --]]
 end
 
 function Spaghetti:decayParameters(decay)
