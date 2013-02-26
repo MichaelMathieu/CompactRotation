@@ -1,6 +1,7 @@
 require 'torch'
 require 'math'
 require 'spaghetti'
+require 'libhessian'
 
 -- butterfly are 2d tensors, lg(N)x(N/2). n = lg(N)
 
@@ -80,6 +81,8 @@ end
 function bfNormalize(net)
    for iModule = 1,#net.modules do
       local netElem = net.modules[iModule]
+      libhessian.bfNormalize(netElem.weight)
+      --[[
       for i = 1,netElem.weight:size(1),4 do
 	 local c = 0.5 * (netElem.weight[i  ] + netElem.weight[i+3])
 	 local s = 0.5 * (netElem.weight[i+1] - netElem.weight[i+2])
@@ -89,6 +92,7 @@ function bfNormalize(net)
 	 netElem.weight[i+2] = -s * normalizer
 	 netElem.weight[i+3] =  c * normalizer
       end
+      --]]
    end
 end
 
