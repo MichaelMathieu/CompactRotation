@@ -11,6 +11,8 @@ op:option{'-e', '--num-epochs', action='store', dest='nEpochs',
 	  default=1000, help='Number of epochs'}
 op:option{'-s', '--num-samples', action='store', dest='nSamples',
 	  default=500, help='Size of the training set'}
+op:option{'-r', '--renew-dataset', action='store_true', dest='renew_dataset',
+	  default=false, help='Generate new training set at each epoch'}
 op:option{'-norm', '--k-normalize', action='store', dest='kNormalize',
 	  default=10, help='Number of SGD iterations between two normalizations'}
 op:option{'-b', '--butterfly-target', action='store_true', dest='butterfly_target',
@@ -19,6 +21,11 @@ op:option{'-lr', '--learning-rate', action='store', dest='learning_rate',
 	  default = 1, help='Learning rate'}
 op:option{'-lrd', '--learning-rate-decay', action='store',
 	  dest='learning_rate_decay', default = 1e-3, help='Learning rate decay'}
+op:option{'-sampling', '--sampling', action='store', dest='sampling',
+	  default='gaussian',
+	  help='Training points sampling method (gaussian|uniform)'}
+op:option{'-c', '--criterion', action='store', dest='criterion',
+	  default='Abs', help='Loss function (MSE|Abs)'}
 opt = op:parse()
 
 local n = tonumber(opt.n)
@@ -30,6 +37,14 @@ if opt.butterfly_target then
 else
    targetMat = randomRotation(N)
 end
+local sampler
+if opt.sampling == 'gaussian' then
+   sampler = torch.randn
+elseif opt.sampling == 'uniform' then
+   sampler = function(nSamples, N)
+		return torch.rand(nSamples,N):mul(2):add(-1)
+	     end
+end
 
 local butterfly2 = torch.randn(n,N/2)
 local net = bf2nn(butterfly2)
@@ -37,16 +52,24 @@ local net = bf2nn(butterfly2)
 local nEpochs = tonumber(opt.nEpochs)
 local nSamples = tonumber(opt.nSamples)
 local kNormalize = tonumber(opt.kNormalize)
-local criterion = nn.MSECriterion()
+local criterion
+if opt.criterion == 'MSE' then
+   criterion = nn.MSECriterion()
+elseif opt.criterion == 'Abs' then
+   criterion = nn.AbsCriterion()
+end
 local config = {learningRate = tonumber(opt.learning_rate), weightDecay = 0,
 		momentum = 0, learningRageDecay = tonumber(opt.learning_rate_decay)}
 print(config)
 local parameters, gradParameters = net:getParameters()
-local samples = torch.randn(nSamples, N)
+local samples = sampler(nSamples, N)
 
 for iEpoch = 1,nEpochs do
    local meanErr = 0
    for iSample = 1,nSamples do
+      if opt.renew_dataset then
+	 samples = sampler(nSamples, N)
+      end
       local input = samples[iSample]
       local target = torch.mm(targetMat, input:reshape(input:size(1),1))
       local feval = function(x)
