@@ -45,8 +45,9 @@ elseif opt.target_matrix == 'hessian' then
    local eigv = torch.randn(N)*0.1
    local p = torch.randperm(N)
    for i = 1,(N/10) do
-      eigv[p[i]] = torch.normal(N/i)
+      eigv[p[i]] = torch.normal(0,1/i)
    end
+   eigv = eigv:abs()
    targetMat = H * torch.diag(eigv) * H:t()
 else
    error("target matrix class "..opt.target_matrix..' not implemented')
@@ -147,6 +148,7 @@ for iEpoch = 1,nEpochs do
    toprint[{{},2}]:copy(target)
    print(toprint)
    --]]
+
    
    meanErr = meanErr/nSamples
    meanAngle = math.acos(meanAngle/nSamples)/3.14159*180
