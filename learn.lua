@@ -40,6 +40,14 @@ if opt.target_matrix == 'butterfly' then
    targetMat = bf2mat(butterfly)
 elseif opt.target_matrix == 'random' then
    targetMat = randomRotation(N)
+elseif opt.target_matrix == 'hessian' then
+   local H = randomRotation(N)
+   local eigv = torch.randn(N)*0.1
+   local p = torch.randperm(N)
+   for i = 1,(N/10) do
+      eigv[p[i]] = torch.normal(N/i)
+   end
+   targetMat = H * torch.diag(eigv) * H:t()
 else
    error("target matrix class "..opt.target_matrix..' not implemented')
 end
@@ -66,8 +74,19 @@ elseif opt.sampling == 'uniform' then
 	     end
 end
 
-local butterfly2 = torch.randn(n,N/2)
-local net = bf2nn(butterfly2)
+local net
+if opt.target_matrix ~= 'hessian' then
+   local butterflyRnd = torch.randn(n,N/2)
+   net = bf2nn(butterflyRnd)
+else
+   net = nn.Sequential()
+   local butterflyRnd = torch.randn(n,N/2)
+   -- H = Q D Q:t()
+   local Q = bf2nn(butterflyRnd)
+   net:add(Q)                    -- Q
+   net:add(nn.CMul(N))           -- D
+   net:add(bfTranspose(Q, true)) -- Q:t()
+end
 
 local nEpochs = tonumber(opt.nEpochs)
 local nSamples = tonumber(opt.nSamples)
@@ -82,6 +101,7 @@ local config = {learningRate = tonumber(opt.learning_rate), weightDecay = 0,
 		momentum = 0, learningRageDecay = tonumber(opt.learning_rate_decay)}
 print(config)
 local parameters, gradParameters = net:getParameters()
+print{parameters}
 local samples = sampler(nSamples, N)
 
 for iEpoch = 1,nEpochs do
@@ -110,7 +130,11 @@ for iEpoch = 1,nEpochs do
 		    end
       optim.sgd(feval, parameters, config)
       if iSample % kNormalize == 0 then
-	 bfNormalize(net)
+	 if opt.target_matrix == 'hessian' then
+	    bfNormalize(net.modules[1])
+	 else
+	    bfNormalize(net)
+	 end
       end
    end
    

@@ -96,6 +96,26 @@ function bfNormalize(net)
    end
 end
 
+function bfTransposeElem(module, shareWeights)
+   local out = nn.Spaghetti(module.conDst,module.conSrc,module.output:size())
+   if shareWeights then
+      --out.weight = module.weight
+      out.weight:set(module.weight)
+      out.gradWeight:set(module.gradWeight)
+   else
+      out.weight:copy(module.weight)
+   end
+   return out
+end
+
+function bfTranspose(net, shareWeights)
+   local out = nn.Sequential()
+   for i = #net.modules,1,-1 do
+      out:add(bfTransposeElem(net.modules[i], shareWeights))
+   end
+   return out
+end
+
 function bf2matElem_testme()
    local butterflyElem = torch.randn(8)
    print(bf2matElem(butterflyElem, 1))
