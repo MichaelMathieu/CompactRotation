@@ -44,7 +44,7 @@ static int Spaghetti_updateOutput(lua_State* L) {
 
   int i, j;
   long sidx, didx;
-#pragma omp parallel for private(i, j, sidx, didx)
+  //#pragma omp parallel for private(i, j, sidx, didx)
   for (i = 0; i < nCon; ++i) {
     sidx = didx = 0;
     for (j = 0; j < nDims; ++j) {
@@ -126,7 +126,7 @@ static int Spaghetti_accGradParameters(lua_State* L) {
 
   int i, j;
   long sidx, didx;
-#pragma omp parallel for private(i, sidx, didx)
+  //#pragma omp parallel for private(i, sidx, didx)
   for (i = 0; i < nCon; ++i) {
     sidx = didx = 0;
     for (j = 0; j < nDims; ++j) {
