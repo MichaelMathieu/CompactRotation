@@ -97,7 +97,9 @@ function bfNormalize(net)
 end
 
 function bfTransposeElem(module, shareWeights)
-   local out = nn.Spaghetti(module.conDst,module.conSrc,module.output:size())
+   local out = nn.Spaghetti(module.conDst:clone(),
+			    module.conSrc:clone(),
+			    module.output:size())
    if shareWeights then
       --out.weight = module.weight
       out.weight:set(module.weight)
@@ -170,5 +172,19 @@ function bf2nnElem_grad_testme()
 	 local nngv = nn1:updateGradInput(v, u):clone()
 	 assert(math.abs(torch.dot(nnvh-nnv,u) - torch.dot(nngv,h))<1e-7)
       end
+   end
+end
+
+function bfTranspose_testme()
+   local n = 5
+   local N = 2^n
+   local butterfly = torch.randn(n, N/2)
+   local nn1 = bf2nn(butterfly)
+   local nn1t = bfTranspose(nn1, false)
+   for j = 1,100 do
+      local v = torch.randn(N)
+      local nnv = nn1:forward(v)
+      local nntnnv = nn1t:forward(nnv)
+      assert((v-nntnnv):abs():max()<1e-5)
    end
 end
