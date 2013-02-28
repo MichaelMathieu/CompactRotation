@@ -42,11 +42,12 @@ elseif opt.target_matrix == 'random' then
    targetMat = randomRotation(N)
 elseif opt.target_matrix == 'hessian' then
    local H = randomRotation(N)
-   local eigv = torch.randn(N)*0.1
+   local eigv = torch.randn(N)*0.01
    local p = torch.randperm(N)
-   for i = 1,(N/10) do
-      eigv[p[i]] = torch.normal(0,1/i)
+   for i = 1,1 do
+      eigv[p[i]] = torch.normal(1,0.1)
    end
+   --eigv[p[1]] = 1
    eigv = eigv:abs()
    targetMat = H * torch.diag(eigv) * H:t()
 else
@@ -99,10 +100,9 @@ elseif opt.criterion == 'Abs' then
    criterion = nn.AbsCriterion()
 end
 local config = {learningRate = tonumber(opt.learning_rate), weightDecay = 0,
-		momentum = 0, learningRageDecay = tonumber(opt.learning_rate_decay)}
+		momentum = 0, learningRateDecay = tonumber(opt.learning_rate_decay)}
 print(config)
 local parameters, gradParameters = net:getParameters()
-print{parameters}
 local samples = sampler(nSamples, N)
 
 for iEpoch = 1,nEpochs do
@@ -125,8 +125,8 @@ for iEpoch = 1,nEpochs do
 		       local df_do = criterion:backward(output, target)
 		       net:backward(input, df_do)
 		       meanErr = meanErr + err
-		       --meanAngle = meanAngle + output:dot(target)/(target:norm()*output:norm())
-		       meanAngle = meanAngle + output:dot(target)
+		       meanAngle = meanAngle + output:dot(target)/(target:norm()*output:norm())
+		       --meanAngle = meanAngle + output:dot(target)
 		       return err, gradParameters
 		    end
       optim.sgd(feval, parameters, config)
