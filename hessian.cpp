@@ -216,12 +216,35 @@ static int BfNormalize(lua_State* L) {
   return 0;
 }
 
+static int BfHalfNormalize(lua_State* L) {
+  const char* idreal = ID_TENSOR_STRING;
+  Tensor* weights      = (Tensor*)luaT_checkudata(L, 1, idreal);
+  
+  int n = weights->size[0];
+  long* ws = weights->stride;
+  Real* wp = Tensor_(data)(weights);
+
+  int i;
+  Real c, s;
+  for (i = 0; i < n; i += 4) {
+    c = 0.5 * (wp[ws[0]*i  ] + wp[ws[0]*i+3]);
+    s = 0.5 * (wp[ws[0]*i+1] - wp[ws[0]*i+2]);
+    wp[ws[0]*i  ] =  c;
+    wp[ws[0]*i+1] =  s;
+    wp[ws[0]*i+2] = -s;
+    wp[ws[0]*i+3] =  c;
+  }
+  
+  return 0;
+}
+
 static const struct luaL_reg libhessian[] = {
   {"QR", QR},
   {"spaghetti_updateOutput", Spaghetti_updateOutput},
   {"spaghetti_updateGradInput", Spaghetti_updateGradInput},
   {"spaghetti_accGradParameters", Spaghetti_accGradParameters},
   {"bfNormalize", BfNormalize},
+  {"bfHalfNormalize", BfHalfNormalize},
   {NULL, NULL}
 };
 

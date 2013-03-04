@@ -113,7 +113,7 @@ for iEpoch = 1,nEpochs do
       if opt.renew_dataset then
 	 samples = sampler(nSamples, N)
       end
-      local input = samples[perm[iSample]]
+      local input = samples[perm[iSample] ]
       local target = torch.mm(targetMat, input:reshape(input:size(1),1))
       local feval = function(x)
 		       if x ~= parameters then
@@ -124,6 +124,7 @@ for iEpoch = 1,nEpochs do
 		       local err = criterion:forward(output, target)
 		       local df_do = criterion:backward(output, target)
 		       net:backward(input, df_do)
+		       bfDistanceToNormalizeAccGrad(net.modules[1], 1)
 		       meanErr = meanErr + err
 		       meanAngle = meanAngle + output:dot(target)/(target:norm()*output:norm())
 		       --meanAngle = meanAngle + output:dot(target)
@@ -132,9 +133,10 @@ for iEpoch = 1,nEpochs do
       optim.sgd(feval, parameters, config)
       if iSample % kNormalize == 0 then
 	 if opt.target_matrix == 'hessian' then
-	    bfNormalize(net.modules[1])
+	    bfHalfNormalize(net.modules[1])
+	    --print(bfDistanceToNormalize(net.modules[1]))
 	 else
-	    bfNormalize(net)
+	    bfHalfNormalize(net)
 	 end
       end
    end

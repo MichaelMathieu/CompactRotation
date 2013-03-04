@@ -96,6 +96,13 @@ function bfNormalize(net)
    end
 end
 
+function bfHalfNormalize(net)
+   for iModule = 1,#net.modules do
+      local netElem = net.modules[iModule]
+      libhessian.bfHalfNormalize(netElem.weight)
+   end
+end   
+
 function bfTransposeElem(module, shareWeights)
    local out = nn.Spaghetti(module.conDst:clone(),
 			    module.conSrc:clone(),
@@ -116,6 +123,40 @@ function bfTranspose(net, shareWeights)
       out:add(bfTransposeElem(net.modules[i], shareWeights))
    end
    return out
+end
+
+function bfDistanceToNormalize(net)
+   local function sq(a)
+      return a*a
+   end
+   local out = 0
+   local n = 0
+   for i = 1,#net.modules do
+      local mod = net.modules[i]
+      for j = 1,mod.weight:size(1),2 do
+	 out = out + sq(1 - sq(mod.weight[j]) - sq(mod.weight[j+1]))
+      end
+      n = n + mod.weight:size(1)
+   end
+   return out/n
+end
+
+function bfDistanceToNormalizeAccGrad(net, lambda)
+   local function sq(a)
+      return a*a
+   end
+   local n = 0
+   for i = 1,#net.modules do
+      n = n + net.modules[i].weight:size(1)
+   end
+   for i = 1,#net.modules do
+      local mod = net.modules[i]
+      for j = 1,mod.weight:size(1),2 do
+	 local d = 4*lambda / n * (1 - sq(mod.weight[j]) - sq(mod.weight[j+1]))
+	 mod.gradWeight[j  ] = mod.gradWeight[j  ] - d * mod.weight[j]
+	 mod.gradWeight[j+1] = mod.gradWeight[j+1] - d * mod.weight[j+1]
+      end
+   end
 end
 
 function bf2matElem_testme()
