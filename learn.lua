@@ -124,7 +124,7 @@ for iEpoch = 1,nEpochs do
 		       local err = criterion:forward(output, target)
 		       local df_do = criterion:backward(output, target)
 		       net:backward(input, df_do)
-		       bfDistanceToNormalizeAccGrad(net.modules[1], 1)
+		       bfDistanceToNormalizeAccGrad(net.modules[1], 0.1)
 		       meanErr = meanErr + err
 		       meanAngle = meanAngle + output:dot(target)/(target:norm()*output:norm())
 		       --meanAngle = meanAngle + output:dot(target)
@@ -134,7 +134,6 @@ for iEpoch = 1,nEpochs do
       if iSample % kNormalize == 0 then
 	 if opt.target_matrix == 'hessian' then
 	    bfHalfNormalize(net.modules[1])
-	    --print(bfDistanceToNormalize(net.modules[1]))
 	 else
 	    bfHalfNormalize(net)
 	 end
@@ -151,8 +150,13 @@ for iEpoch = 1,nEpochs do
    print(toprint)
    --]]
 
-   
+   local distToNormalize
+   if opt.target_matrix == 'hessian' then
+      distToNormalize = bfDistanceToNormalize(net.modules[1])
+   else
+      distToNormalize = bfDistanceToNormalize(net)
+   end
    meanErr = meanErr/nSamples
    meanAngle = math.acos(meanAngle/nSamples)/3.14159*180
-   print("meanErr="..meanErr.."  meanAngle="..meanAngle.." (epoch "..iEpoch..")")
+   print("meanErr="..meanErr.."  meanAngle="..meanAngle.."  distToNormalize="..distToNormalize.." (epoch "..iEpoch..")")
 end

@@ -12,6 +12,10 @@ template<typename T> inline T min(T a, T b) {
   return (a < b) ? a : b;
 }
 
+template<typename T> inline T sq(T a) {
+  return a*a;
+}
+
 typedef THDoubleTensor Tensor;
 #define ID_TENSOR_STRING "torch.DoubleTensor"
 #define Tensor_(a) THDoubleTensor_##a
@@ -238,6 +242,32 @@ static int BfHalfNormalize(lua_State* L) {
   return 0;
 }
 
+static int BfDistanceToNormalizeAccGrad(lua_State* L) {
+  const char* idreal = ID_TENSOR_STRING;
+  Tensor* weights      = (Tensor*)luaT_checkudata(L, 1, idreal);
+  Tensor* gradWeights  = (Tensor*)luaT_checkudata(L, 2, idreal);
+  Real    lambda       =          lua_tonumber(L, 3);
+  Real    ntot         =          lua_tonumber(L, 4);
+  
+  int n = weights->size[0];
+  long*  ws = weights->stride;
+  long* gws = gradWeights->stride;
+  Real*  wp = Tensor_(data)(weights);
+  Real* gwp = Tensor_(data)(gradWeights);
+
+  int i;
+  Real a, b, d, d0 = - 4.*lambda / ntot;
+  for (i = 0; i < n; i += 2) {
+    a = wp[ws[0]*i];
+    b = wp[ws[0]*(i+1)];
+    d = d0 * (1. - sq(a) - sq(b));
+    gwp[gws[0]*i]     += d*a;
+    gwp[gws[0]*(i+1)] += d*b;
+  }
+  
+  return 0;
+}
+
 static const struct luaL_reg libhessian[] = {
   {"QR", QR},
   {"spaghetti_updateOutput", Spaghetti_updateOutput},
@@ -245,6 +275,7 @@ static const struct luaL_reg libhessian[] = {
   {"spaghetti_accGradParameters", Spaghetti_accGradParameters},
   {"bfNormalize", BfNormalize},
   {"bfHalfNormalize", BfHalfNormalize},
+  {"bfDistanceToNormalizeAccGrad", BfDistanceToNormalizeAccGrad},
   {NULL, NULL}
 };
 
