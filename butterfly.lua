@@ -104,10 +104,15 @@ function bfHalfNormalize(net)
 end   
 
 function bfTransposeElem(module, shareWeights)
+   local out = nn.Spaghetti(module.conDst:clone(),
+			    module.conSrc:clone(),
+			    module.output:size())
+   --[[
    local out = nn.Spaghetti(module.conDst:clone():add(1),
 			    module.conSrc:clone():add(1),
-			    module.output:size())
-   --module.conWeights:clone():add(1))
+			    module.output:size(),
+			    module.conWeights:clone():add(1))
+   --]]
    if shareWeights then
       --out.weight = module.weight
       out.weight:set(module.weight)

@@ -6,6 +6,10 @@ require 'hessian-optim'
 require 'xlua'
 require 'timer'
 
+local function isnan(a)
+   return a ~= a
+end
+
 torch.manualSeed(42)
 
 local nEpochs = 1000
@@ -34,17 +38,11 @@ local config = {learningRate = 1e-2, learningRateDecay = 1e-7}
 local crit = nn.ClassNLLCriterion()
 local confusion = optim.ConfusionMatrix(10)
 
-ho = HessianOptimizer(parameters:size(1), 0.01, 1e-5)
+ho = HessianOptimizer(parameters:size(1), 0.01, 0)
 
 local trainErrs = {}
 local testErrs  = {}
 local confusions = {}
-
-local tfb1 = newTimer("f/b 1")
-local tclone = newTimer("clone")
-local tfb1b = newTimer("f/b 1b")
-local tfb2 = newTimer("f/b 2")
-local tinv = newTimer("inv H")
 
 local dw = torch.Tensor(parameters:size(1))
 
@@ -52,7 +50,7 @@ for iEpoch = 1,nEpochs do
    local perm = torch.randperm(nSamples)
    local meanErr = 0
    for iSample = 1,nSamples,nMinibatch do
-      --xlua.progress(iSample, nSamples)
+      xlua.progress(iSample, nSamples)
       local feval = function(x)
 		       --local copyBack = nil
 		       if parameters ~= x then
@@ -81,18 +79,21 @@ for iEpoch = 1,nEpochs do
 		    end
 
 
-      local lr = 1e-5
+      local lr = 1
       local _, gp = feval(parameters)
       gx = gp:clone()
-      dw:normal() --why does that slow the NEXT feval ????
-      dw:div(dw:norm())
+      dw:copy(gx)
+      --dw:normal() --why does that slow the NEXT feval ????
       parameters:add(lr, dw)
       local _, gxp = feval(parameters)
       parameters:add(-lr, dw)
       ho:newPoint(gxp-gx, dw)
       local p = ho:invHessian(gx):clone()
-      print(p:mean())
-      parameters:add(p:mul(-lr))
+      if isnan(p:mean()) then
+	 print "NaN..."
+	 exit(0)
+      end
+      parameters:add(-1, p)
 
       --optim.sgd(feval, parameters, config)
    end
