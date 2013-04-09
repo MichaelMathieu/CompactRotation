@@ -35,33 +35,47 @@ end
 
 function bf2nnElem(butterflyElem, stride)
    local N = butterflyElem:size(1)*2
-   local conSrc = torch.LongTensor(N*2,1)
-   local conDst = torch.LongTensor(N*2,1)
+
    local weights = torch.Tensor(N*2)
-   local k = 1
-   for i = 1,(N-stride),(2*stride) do
-      for j = i,(i+stride-1) do
-	 local alpha = butterflyElem[(i-1)/2+1+j-i]
-	 local ca = math.cos(alpha)
-	 local sa = math.sin(alpha)
-	 conSrc[k] = j
-	 conDst[k] = j
-	 weights[k] = ca
-	 k = k + 1
-	 conSrc[k] = j+stride
-	 conDst[k] = j
-	 weights[k] = sa
-	 k = k + 1
-	 conSrc[k] = j
-	 conDst[k] = j+stride
-	 weights[k] = -sa
-	 k = k + 1
-	 conSrc[k] = j+stride
-	 conDst[k] = j+stride
-	 weights[k] = ca
-	 k = k + 1
-      end
-   end
+   local a = butterflyElem:clone():cos()
+   local t = torch.Tensor()
+   t:set(weights:storage(), 1, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(a)
+   t:set(weights:storage(), 4, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(a)
+   a:copy(butterflyElem)
+   a:sin()
+   t:set(weights:storage(), 2, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(a)
+   a:mul(-1)
+   t:set(weights:storage(), 3, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(a)
+
+   local linspace = torch.linspace(1, N, N)
+   local r = linspace:reshape(N/(stride*2), stride*2)
+   local upper = r:narrow(2, 1, stride)
+   local lower = r:narrow(2, 1+stride, stride)
+   local conSrc = torch.LongTensor(N*2, 1)
+   local conDst = torch.LongTensor(N*2, 1)
+   t = torch.LongTensor()
+   t:set(conSrc:storage(), 1, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(upper)
+   t:set(conSrc:storage(), 3, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(upper)
+   t:set(conSrc:storage(), 2, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(lower)
+   t:set(conSrc:storage(), 4, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(lower)
+
+   t:set(conDst:storage(), 1, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(upper)
+   t:set(conDst:storage(), 2, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(upper)
+   t:set(conDst:storage(), 3, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(lower)
+   t:set(conDst:storage(), 4, torch.LongStorage{N/2}, torch.LongStorage{4})
+   t:copy(lower)
+
    local out = nn.Spaghetti(conSrc, conDst, torch.LongStorage{N})
    out.weight:copy(weights)
    return out

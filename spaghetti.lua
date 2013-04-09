@@ -24,7 +24,7 @@ function Spaghetti:__init(conSrc, conDst, dimDst)
    self.gradWeight = torch.Tensor():resizeAs(self.weight)
    self.output = torch.Tensor(dimDst)
    self.gradInput = torch.Tensor()
-   self:reset()
+   --self:reset()
 end
 
 function Spaghetti:reset(stdv)
@@ -52,8 +52,10 @@ end
 
 function Spaghetti:updateGradInput(input, gradOutput)
    self.gradInput:resizeAs(input)
-   libhessian.spaghetti_updateGradInput(input, self.conSrc, self.conDst,
-					self.weight, gradOutput, self.gradInput)
+   --libhessian.spaghetti_updateGradInput(input, self.conSrc, self.conDst,
+   --self.weight, gradOutput, self.gradInput)
+   libhessian.spaghetti_updateOutput(gradOutput, self.conDst, self.conSrc,
+				     self.weight, self.gradInput)
    return self.gradInput
    --[[
    self.gradInput:resizeAs(input):zero()
