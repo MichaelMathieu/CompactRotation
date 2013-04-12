@@ -2,3 +2,6 @@
 *~
 libhessian.so
 *.o
+out
+old
+mnist-th7

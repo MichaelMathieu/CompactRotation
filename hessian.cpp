@@ -292,18 +292,31 @@ static int BfHalfNormalize(lua_State* L) {
   Tensor* weights      = (Tensor*)luaT_checkudata(L, 1, idreal);
   
   int n = weights->size[0];
-  long* ws = weights->stride;
+  long ws = weights->stride[0];
   Real* wp = Tensor_(data)(weights);
 
-  int i;
-  Real c, s;
-  for (i = 0; i < n; i += 4) {
-    c = 0.5 * (wp[ws[0]*i  ] + wp[ws[0]*i+3]);
-    s = 0.5 * (wp[ws[0]*i+1] - wp[ws[0]*i+2]);
-    wp[ws[0]*i  ] =  c;
-    wp[ws[0]*i+1] =  s;
-    wp[ws[0]*i+2] = -s;
-    wp[ws[0]*i+3] =  c;
+  if (ws == 1) {
+    int i;
+#pragma omp parallel for private(i)
+    for (i = 0; i < n; i += 4) {
+      const Real c = 0.5 * (wp[i  ] + wp[i+3]);
+      const Real s = 0.5 * (wp[i+1] - wp[i+2]);
+      wp[i  ] =  c;
+      wp[i+1] =  s;
+      wp[i+2] = -s;
+      wp[i+3] =  c;
+    }
+  } else {
+    int i;
+#pragma omp parallel for private(i)
+    for (i = 0; i < n; i += 4) {
+      const Real c = 0.5 * (wp[ws*i  ] + wp[ws*(i+3)]);
+      const Real s = 0.5 * (wp[ws*(i+1)] - wp[ws*(i+2)]);
+      wp[ws*(i  )] =  c;
+      wp[ws*(i+1)] =  s;
+      wp[ws*(i+2)] = -s;
+      wp[ws*(i+3)] =  c;
+    }
   }
   
   return 0;
