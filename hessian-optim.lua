@@ -4,11 +4,13 @@ require 'optim'
 
 torch.class("HessianOptimizer")
 
-function HessianOptimizer:__init(N, lambda, learningRate)
+function HessianOptimizer:__init(N, lambda, learningRate, normalizationRate)
    self.n = math.ceil(math.log(N,2))
    self.N = 2^self.n
    self.Nv = N
    self.lambda = lambda
+   self.normalizationRate = normalizationRate or 1
+   self.normalizationCounter = 0
 
    self.input = torch.zeros(self.N)
    self.dfdo_pad = torch.zeros(self.N)
@@ -39,6 +41,7 @@ end
 --]]
 
 function HessianOptimizer:newPoint(input, target)
+   self.normalizationCounter = self.normalizationCounter + 1
    self.input[{{1,self.Nv}}]:copy(input)
    local function lfeval(x)
       if x ~= self.parameters then
@@ -50,11 +53,16 @@ function HessianOptimizer:newPoint(input, target)
       local err = self.criterion:forward(output, target)
       local dfdo = self.criterion:backward(output, target)
       self.net:backward(self.input, self.dfdo_pad)
-      bfDistanceToNormalizeAccGrad(self.butterfly, self.lambda)
+      if self.normalizationCounter >= self.normalizationRate then
+	 bfDistanceToNormalizeAccGrad(self.butterfly, self.lambda)
+      end
       return err, self.gradParameters
    end
    optim.sgd(lfeval, self.parameters, self.config)
-   bfHalfNormalize(self.butterfly)
+   if self.normalizationCounter >= self.normalizationRate then
+      bfHalfNormalize(self.butterfly)
+      self.normalizationCounter = 0
+   end
 
    --print(self.parameters:mean())
    

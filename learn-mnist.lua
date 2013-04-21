@@ -19,6 +19,9 @@ torch.manualSeed(42)
 
 dofile('config-conv.lua')
 
+train_set = mnist.loadTrainSet(nSamples, geo)
+test_set  = mnist.loadTestSet (nTestSamples, geo)
+
 local controlParameters = parameters:clone()
 local backupParameters = parameters:clone()
 

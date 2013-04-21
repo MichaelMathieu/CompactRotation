@@ -7,9 +7,6 @@ geo = {32, 32}
 nhidden1 = 120
 nhidden2 = 80
 
-train_set = mnist.loadTrainSet(nSamples, geo)
-test_set  = mnist.loadTestSet (nTestSamples, geo)
-
 net = nn.Sequential()
 --stage 1
 net:add(nn.SpatialContrastiveNormalization())
