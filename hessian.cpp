@@ -54,7 +54,7 @@ static int Spaghetti_updateOutput(lua_State* L) {
   Real* wp  = Tensor_(data)(weights);
   Real* op  = Tensor_(data)(output );
 
-  /*
+#if 0
   Tensor_(zero)(output);
   int i, j;
   long sidx, didx;
@@ -66,7 +66,7 @@ static int Spaghetti_updateOutput(lua_State* L) {
     }
     op[didx] += wp[ws[0]*i] * ip[sidx];
   }
-  */
+#else
   
   //TODO: that only works if the input and output have dim 1
   assert(sizeof(MKL_INT) == sizeof(long));
@@ -85,6 +85,7 @@ static int Spaghetti_updateOutput(lua_State* L) {
   Real* y = op;
   mkl_dcoomv(&transa, &m, &k, &alpha, matdescr, val, rowind, colind,
 	     &nnz, x, &beta, y);
+#endif
   return 0;
 }
 

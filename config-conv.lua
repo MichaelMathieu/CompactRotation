@@ -31,11 +31,12 @@ net:add(nn.LogSoftMax())
 parameters, gradParameters = net:getParameters()
 print(parameters:size(1) .. " parameters")
 
-config = {learningRate = 0.5, learningRateDecay = 1e-4}
+config = {learningRate = 0.2, learningRateDecay = 1e-4}
 
 crit = nn.ClassNLLCriterion()
 confusion = optim.ConfusionMatrix(10)
 confusionControl = optim.ConfusionMatrix(10)
 
-ho = HessianOptimizer(parameters:size(1), 0.01, 1e5)
-
+ho = HessianOptimizer(parameters:size(1), 0.01, 1, 1)
+learningRateHO = 1
+learningRateDecayHO = 0

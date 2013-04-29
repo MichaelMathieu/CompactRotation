@@ -10,6 +10,7 @@ require 'xlua'
 require 'timer'
 require 'image'
 require 'sys'
+require 'cut'
 
 local function isnan(a)
    return a ~= a
@@ -32,6 +33,7 @@ local confusions = {}
 local gx = torch.Tensor(parameters:size(1))
 local dw = torch.Tensor(parameters:size(1))
 local nevals = 0
+local lrdw = 0
 
 print("starting")
 for iEpoch = 1,nEpochs do
@@ -72,16 +74,16 @@ for iEpoch = 1,nEpochs do
 		    end
 
 
-      local lrd =1e-4
-      local lr = 0.5
+      local lrd = learningRateDecayHO
+      local lr = learningRateHO
       local _, gp = feval(parameters)
       --sys:toc()
       gx:copy(gp)
       dw:copy(gx)
       --dw:normal() --why does that slow the NEXT feval ????
-      parameters:add(lr, dw)
+      parameters:add(lrdw, dw)
       local _, gxp = feval(parameters)
-      parameters:add(-lr, dw)
+      parameters:add(-lrdw, dw)
       --sys:toc()
       --sys:tic()
       --gxp:add(-1, gx) --TODO: why doesn't this work? likely a bug
@@ -93,8 +95,22 @@ for iEpoch = 1,nEpochs do
 	 print "NaN..."
 	 exit(0)
       end
+
+      if nevals % 25 == 0 then
+	 meanErrCpy = meanErr
+	 local lambda = lr / (1+lrd*nevals)
+	 local energy = cutEnergy(feval, parameters, p, -lambda)
+	 local energyControl = cutEnergy(feval, parameters, gx, -lambda)
+	 local todisp = torch.Tensor(energy:size(1), 2)
+	 todisp[{{},1}]:copy(energy)
+	 todisp[{{},2}]:copy(energyControl)
+	 print(todisp)
+	 meanErr = meanErrCpy
+      end
+
       parameters:add(-lr/(1+lrd*nevals), p)
-      nevals = nevals + 1      
+      lrdw = lr/(1+lrd*nevals)*p:norm()
+      nevals = nevals + 1
 
       --sys:toc()
       
@@ -103,6 +119,7 @@ for iEpoch = 1,nEpochs do
       optim.sgd(feval, controlParameters, config)
       parameters:copy(backupParameters)
       meanErr = meanErrCpy
+
    end
    meanErr = meanErr / nSamples
    trainErrs[iEpoch] = meanErr

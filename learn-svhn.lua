@@ -10,6 +10,7 @@ require 'xlua'
 require 'timer'
 require 'image'
 require 'sys'
+require 'cut'
 
 local function isnan(a)
    return a ~= a
@@ -32,6 +33,7 @@ local confusions = {}
 local gx = torch.Tensor(parameters:size(1))
 local dw = torch.Tensor(parameters:size(1))
 local nevals = 0
+local lrdw = 1
 
 print("starting")
 for iEpoch = 1,nEpochs do
@@ -44,9 +46,9 @@ for iEpoch = 1,nEpochs do
       --print("--")
       --sys:tic()
       local feval = function(x)
-		       --local copyBack = nil
+		       local copyBack = nil
 		       if parameters ~= x then
-			  --copyBack = parameters:clone()
+			  copyBack = parameters:clone()
 			  parameters:copy(x)
 		       end
 		       gradParameters:zero()
@@ -61,46 +63,71 @@ for iEpoch = 1,nEpochs do
 			  net:backward(input, dfdo)
 		       end
 		       gradParameters:div(nMinibatch)
-		       err = err / nMinibatch
+		       --err = err/nMinibatch
 		       meanErr = meanErr + err
-		       --if copyBack ~= nil then
-		       --parameters:copy(copyBack)
-		       --end
+		       if copyBack ~= nil then
+			  parameters:copy(copyBack)
+		       end
 		       return err, gradParameters
 		    end
 
 
       local lrd = learningRateDecayHO
       local lr = learningRateHO
-      local _, gp = feval(parameters)
+      local curErr, gp = feval(parameters)
       --sys:toc()
       gx:copy(gp)
       dw:copy(gx)
       --dw:normal() --why does that slow the NEXT feval ????
-      parameters:add(lr, dw)
+      parameters:add(lrdw, dw)
+      local meanErrCpy = meanErr
       local _, gxp = feval(parameters)
-      parameters:add(-lr, dw)
+      meanErr = meanErrCpy
+      parameters:add(-lrdw, dw)
       --sys:toc()
       --sys:tic()
-      --gxp:add(-1, gx) --TODO: why doesn't this work? likely a bug
-      gxp = gxp - gx
+      gxp:add(-1, gx) --TODO: why doesn't this work? likely a bug
+      --gxp = gxp - gx
+      print("error before " .. (ho:fprop(gxp) - dw):norm())
       ho:newPoint(gxp, dw)
+      print("error after " .. (ho:fprop(gxp) - dw):norm())
       --sys:toc()
       local p = ho:invHessian(dw)
       if isnan(ho.parameters:mean()) then
 	 print "NaN..."
 	 exit(0)
       end
+      
+      --[[
+      if nevals % 10 == 0 then
+	 meanErrCpy = meanErr
+	 local lambda = lr / (1+lrd*nevals)
+	 local energy = cutEnergy(feval, parameters, p, -lambda)
+	 local energyControl = cutEnergy(feval, parameters, gx, -lambda)
+	 local todisp = torch.Tensor(energy:size(1), 2)
+	 todisp[{{},1}]:copy(energy)
+	 todisp[{{},2}]:copy(energyControl)
+	 print(todisp)
+	 meanErr = meanErrCpy
+      end
+      --]]
+
       parameters:add(-lr/(1+lrd*nevals), p)
+      lrdw = lr/(1+lrd*nevals)*p:norm()
       nevals = nevals + 1      
 
       --sys:toc()
       
-      local meanErrCpy = meanErr
-      backupParameters:copy(parameters)
+      meanErrCpy = meanErr
+      meanErr = 0
+      --backupParameters:copy(parameters)
       optim.sgd(feval, controlParameters, config)
-      parameters:copy(backupParameters)
+      --parameters:copy(backupParameters)
+      --meanErrControl = meanErr
+      print(curErr .. " " .. meanErr)
+      print(torch.histc(ho.net.modules[2].weight,20,0,2))
       meanErr = meanErrCpy
+			       
    end
    meanErr = meanErr / nSamples
    trainErrs[iEpoch] = meanErr
